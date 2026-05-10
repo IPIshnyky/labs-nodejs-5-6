@@ -24,22 +24,33 @@ Copy the template from .env.example to a new file named .env and ensure the conn
 We use SQL scripts in the migrations/ folder to manage the database schema.
 
 - Up: 001_create_tasks_table.up.sql - Creates the tasks table.
-- Down: 001_create_tasks_table.down.sql - Drops the table.
+- Up: 002_create_priorities_table.up.sql - Creates the priorities table and links tasks to it.
+- Down: 001_create_tasks_table.down.sql - Drops the tasks table.
+- Down: 002_create_priorities_table.down.sql - Removes the priorities relation and drops the priorities table.
 
 ## Table Structure (DDL)
 
-The core table for this project is `tasks`:
+The core tables for this project are `tasks` and `priorities`:
 
 ```sql
+CREATE TABLE IF NOT EXISTS priorities (
+    id INT PRIMARY KEY,
+    code VARCHAR(20) NOT NULL UNIQUE,
+    label VARCHAR(50) NOT NULL,
+    weight INT NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS tasks (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     due_date DATE,
-    priority INT DEFAULT 1,
+    priority INT NOT NULL DEFAULT 1 REFERENCES priorities(id),
     is_done BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+Relationship: one priority can be assigned to many tasks (`priorities` 1:N `tasks`).
 
 ## Data Management Scripts
 
@@ -53,13 +64,13 @@ Use the following npm scripts defined in package.json to manage your data:
 
 The following raw SQL queries are implemented in **src/repositories/taskRepo.js** using the pg (node-postgres) library:
 
-| Operation  | SQL Command                                                                                         |
-| :--------- | :-------------------------------------------------------------------------------------------------- |
-| Create     | INSERT INTO tasks (title, due_date, priority, is_done) VALUES ($1, $2, $3, $4) RETURNING \*;        |
-| Read (All) | SELECT id, title, due_date, priority, is_done, created_at FROM tasks ORDER BY created_at DESC;      |
-| Read (One) | SELECT \* FROM tasks WHERE id = $1;                                                                 |
-| Update     | UPDATE tasks SET title = $1, due_date = $2, priority = $3, is_done = $4 WHERE id = $5 RETURNING \*; |
-| Delete     | DELETE FROM tasks WHERE id = $1 RETURNING id;                                                       |
+| Operation  | SQL Command                                                                                                        |
+| :--------- | :----------------------------------------------------------------------------------------------------------------- |
+| Create     | INSERT INTO tasks (title, due_date, priority, is_done) VALUES ($1, $2, $3, $4) RETURNING \*;                       |
+| Read (All) | SELECT t.\*, p.code AS priority_code FROM tasks t JOIN priorities p ON p.id = t.priority ORDER BY created_at DESC; |
+| Read (One) | SELECT t.\*, p.code AS priority_code FROM tasks t JOIN priorities p ON p.id = t.priority WHERE t.id = $1;          |
+| Update     | UPDATE tasks SET title = $1, due_date = $2, priority = $3, is_done = $4 WHERE id = $5 RETURNING \*;                |
+| Delete     | DELETE FROM tasks WHERE id = $1 RETURNING id;                                                                      |
 
 ## Transaction Demonstration
 

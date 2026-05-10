@@ -14,7 +14,7 @@ export class TaskRepo {
       id: String(row.id),
       title: row.title,
       date: row.due_date ? row.due_date.toISOString().split("T")[0] : null,
-      priority: priorityMap[row.priority] || "low",
+      priority: row.priority_code || priorityMap[row.priority] || "low",
       completed: row.is_done,
     };
   }
@@ -30,9 +30,10 @@ export class TaskRepo {
 
   async getAll() {
     const result = await pool.query(
-      `SELECT id, title, due_date, priority, is_done, created_at 
-       FROM tasks 
-       ORDER BY created_at DESC`,
+      `SELECT t.id, t.title, t.due_date, t.priority, p.code AS priority_code, t.is_done, t.created_at
+       FROM tasks t
+       JOIN priorities p ON p.id = t.priority
+       ORDER BY t.created_at DESC`,
     );
 
     return result.rows.map((row) => this.#mapRowToTask(row));
@@ -40,9 +41,10 @@ export class TaskRepo {
 
   async getById(id) {
     const result = await pool.query(
-      `SELECT id, title, due_date, priority, is_done, created_at 
-       FROM tasks 
-       WHERE id = $1`,
+      `SELECT t.id, t.title, t.due_date, t.priority, p.code AS priority_code, t.is_done, t.created_at
+       FROM tasks t
+       JOIN priorities p ON p.id = t.priority
+       WHERE t.id = $1`,
       [id],
     );
 
@@ -58,7 +60,8 @@ export class TaskRepo {
       const result = await client.query(
         `INSERT INTO tasks (title, due_date, priority, is_done)
          VALUES ($1, $2, $3, $4)
-         RETURNING id, title, due_date, priority, is_done, created_at`,
+         RETURNING id, title, due_date, priority, is_done, created_at,
+           (SELECT code FROM priorities WHERE id = priority) AS priority_code`,
         [task.title, task.date || null, priorityInt, false],
       );
 
@@ -103,7 +106,10 @@ export class TaskRepo {
       if (fields.length === 0) {
         await client.query("ROLLBACK");
         const existing = await client.query(
-          "SELECT id, title, due_date, priority, is_done, created_at FROM tasks WHERE id = $1",
+          `SELECT t.id, t.title, t.due_date, t.priority, p.code AS priority_code, t.is_done, t.created_at
+           FROM tasks t
+           JOIN priorities p ON p.id = t.priority
+           WHERE t.id = $1`,
           [id],
         );
         return existing.rows.length > 0
@@ -112,7 +118,11 @@ export class TaskRepo {
       }
 
       values.push(id);
-      const query = `UPDATE tasks SET ${fields.join(", ")} WHERE id = $${paramCount} RETURNING id, title, due_date, priority, is_done, created_at`;
+      const query = `UPDATE tasks
+        SET ${fields.join(", ")}
+        WHERE id = $${paramCount}
+        RETURNING id, title, due_date, priority, is_done, created_at,
+          (SELECT code FROM priorities WHERE id = priority) AS priority_code`;
 
       const result = await client.query(query, values);
 
@@ -132,10 +142,11 @@ export class TaskRepo {
       await client.query("BEGIN");
 
       const overdue = await client.query(
-        `SELECT id, title, due_date, priority, is_done, created_at
-         FROM tasks
+        `SELECT t.id, t.title, t.due_date, t.priority, p.code AS priority_code, t.is_done, t.created_at
+         FROM tasks t
+         JOIN priorities p ON p.id = t.priority
          WHERE due_date < CURRENT_DATE AND is_done = false
-         ORDER BY priority DESC, due_date ASC`,
+         ORDER BY p.weight DESC, due_date ASC`,
       );
 
       if (overdue.rows.length === 0) {
@@ -187,9 +198,17 @@ export class TaskRepo {
 
         const result = await client.query(
           `UPDATE tasks
-           SET due_date = $1, priority = LEAST(priority + 1, 3)
+           SET due_date = $1,
+             priority = (
+               SELECT next_priority.id
+               FROM priorities current_priority
+               JOIN priorities next_priority
+                 ON next_priority.weight = LEAST(current_priority.weight + 1, 3)
+               WHERE current_priority.id = tasks.priority
+           )
            WHERE id = $2
-           RETURNING id, title, due_date, priority, is_done, created_at`,
+           RETURNING id, title, due_date, priority, is_done, created_at,
+             (SELECT code FROM priorities WHERE id = priority) AS priority_code`,
           [targetDate, row.id],
         );
 
