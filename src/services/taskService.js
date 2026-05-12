@@ -101,7 +101,10 @@ export class TaskService {
       throw err;
     }
 
-    const completed = dto?.completed === "true" || dto?.completed === "on";
+    const completed =
+      dto?.completed === true ||
+      dto?.completed === "true" ||
+      dto?.completed === "on";
 
     const updated = await this.#repo.update(id, {
       title,
@@ -138,8 +141,8 @@ export class TaskService {
     return this.#repo.rescheduleOverdue(maxPerDayInt, windowDaysInt);
   }
 
-  removeTask(id) {
-    const result = this.#repo.delete(id);
+  async removeTask(id) {
+    const result = await this.#repo.delete(id);
 
     if (result === null) {
       const err = new Error("Task not found");

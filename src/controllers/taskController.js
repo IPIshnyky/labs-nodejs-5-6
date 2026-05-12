@@ -106,9 +106,9 @@ export class TaskController {
     }
   };
 
-  deleteTask = (req, res, next) => {
+  deleteTask = async (req, res, next) => {
     try {
-      this.#service.removeTask(req.params.id);
+      await this.#service.removeTask(req.params.id);
       res.redirect(303, "/");
     } catch (error) {
       next(error);
