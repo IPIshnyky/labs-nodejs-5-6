@@ -5,11 +5,13 @@ import path from "path";
 import { TaskRepo } from "./src/repositories/taskRepo.js";
 import { TaskService } from "./src/services/taskService.js";
 import { TaskController } from "./src/controllers/taskController.js";
+import { ApiTaskController } from "./src/controllers/apiTaskController.js";
 
 // Dependency injection composition root
 const taskRepo = new TaskRepo();
 const taskService = new TaskService(taskRepo);
 const taskController = new TaskController(taskService);
+const apiTaskController = new ApiTaskController(taskService);
 
 const app = express();
 
@@ -32,6 +34,14 @@ app.get("/tasks/:id/edit", taskController.renderEditForm);
 app.post("/tasks/:id/update", taskController.submitUpdate);
 app.post("/tasks/:id/toggle", taskController.toggleTaskStatus);
 app.post("/tasks/:id/delete", taskController.deleteTask);
+
+// API Routes
+app.get("/api/tasks", apiTaskController.getAllTasks);
+app.get("/api/tasks/:id", apiTaskController.getTask);
+app.post("/api/tasks", apiTaskController.createTask);
+app.put("/api/tasks/:id", apiTaskController.updateTask);
+app.patch("/api/tasks/:id", apiTaskController.patchTask);
+app.delete("/api/tasks/:id", apiTaskController.deleteTask);
 
 app.use((_req, res) => {
   res.status(404).sendFile(path.join(import.meta.dirname, "public/404.html"));
