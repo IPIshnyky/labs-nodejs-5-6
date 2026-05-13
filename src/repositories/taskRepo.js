@@ -4,6 +4,16 @@ import sequelize from "../db/index.js";
 import { Task, Priority } from "../models/index.js";
 
 export class TaskRepo {
+  #dateToDateOnly(value) {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+      return value.toISOString().split("T")[0];
+    }
+
+    return String(value).split("T")[0];
+  }
+
   #mapTaskToDTO(taskInstance) {
     if (!taskInstance) return null;
 
@@ -21,9 +31,7 @@ export class TaskRepo {
     return {
       id: String(taskInstance.id),
       title: taskInstance.title,
-      date: taskInstance.dueDate
-        ? taskInstance.dueDate.toISOString().split("T")[0]
-        : null,
+      date: this.#dateToDateOnly(taskInstance.dueDate),
       priority,
       completed: taskInstance.isDone,
     };
@@ -191,9 +199,7 @@ export class TaskRepo {
 
       const slotMap = new Map(
         existing.map((r) => {
-          const day =
-            r.dueDate instanceof Date ? r.dueDate : new Date(r.dueDate);
-          return [day.toISOString().split("T")[0], Number(r.count)];
+          return [this.#dateToDateOnly(r.dueDate), Number(r.count)];
         }),
       );
 

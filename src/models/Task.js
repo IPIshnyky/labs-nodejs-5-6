@@ -14,7 +14,7 @@ export default (sequelize) => {
         allowNull: false,
       },
       dueDate: {
-        type: DataTypes.DATE,
+        type: DataTypes.DATEONLY,
         allowNull: true,
         field: "due_date",
       },
