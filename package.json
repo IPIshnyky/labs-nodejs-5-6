@@ -12,7 +12,14 @@
     "migrate:up": "node scripts/migrate.js up",
     "migrate:down": "node scripts/migrate.js down",
     "migrate:refresh": "node scripts/migrate.js refresh",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:migrate:status": "sequelize-cli db:migrate:status",
     "seed": "node scripts/seed.js",
+    "seed:down": "node scripts/seed.js down",
+    "seed:refresh": "node scripts/seed.js refresh",
+    "db:seed": "sequelize-cli db:seed:all",
+    "db:seed:undo": "sequelize-cli db:seed:undo:all",
     "ci": "npm run migrate:up && npm run seed && npm test"
   },
   "repository": {
@@ -31,7 +38,8 @@
     "express": "^5.2.1",
     "geist": "^1.0.0",
     "morgan": "^1.10.1",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "sequelize": "^6.37.8"
   },
   "lint-staged": {
     "*": "prettier --write --ignore-unknown"
@@ -40,6 +48,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "nodemon": "^3.1.13",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "sequelize-cli": "^6.6.5"
   }
 }

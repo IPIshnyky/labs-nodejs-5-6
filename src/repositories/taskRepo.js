@@ -1,8 +1,21 @@
-import pool from "../db/index.js";
+import { Op } from "sequelize";
+
+import sequelize from "../db/index.js";
+import { Task, Priority } from "../models/index.js";
 
 export class TaskRepo {
-  #mapRowToTask(row) {
-    if (!row) return null;
+  #dateToDateOnly(value) {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+      return value.toISOString().split("T")[0];
+    }
+
+    return String(value).split("T")[0];
+  }
+
+  #mapTaskToDTO(taskInstance) {
+    if (!taskInstance) return null;
 
     const priorityMap = {
       1: "low",
@@ -10,12 +23,17 @@ export class TaskRepo {
       3: "high",
     };
 
+    const priority =
+      taskInstance.priorityData?.code ||
+      priorityMap[taskInstance.priority] ||
+      "low";
+
     return {
-      id: String(row.id),
-      title: row.title,
-      date: row.due_date ? row.due_date.toISOString().split("T")[0] : null,
-      priority: row.priority_code || priorityMap[row.priority] || "low",
-      completed: row.is_done,
+      id: String(taskInstance.id),
+      title: taskInstance.title,
+      date: this.#dateToDateOnly(taskInstance.dueDate),
+      priority,
+      completed: taskInstance.isDone,
     };
   }
 
@@ -29,148 +47,164 @@ export class TaskRepo {
   }
 
   async getAll() {
-    const result = await pool.query(
-      `SELECT t.id, t.title, t.due_date, t.priority, p.code AS priority_code, t.is_done, t.created_at
-       FROM tasks t
-       JOIN priorities p ON p.id = t.priority
-       ORDER BY t.created_at DESC`,
-    );
+    const tasks = await Task.findAll({
+      include: [{ model: Priority, as: "priorityData" }],
+      order: [["createdAt", "DESC"]],
+    });
 
-    return result.rows.map((row) => this.#mapRowToTask(row));
+    return tasks.map((task) => this.#mapTaskToDTO(task));
   }
 
   async getById(id) {
-    const result = await pool.query(
-      `SELECT t.id, t.title, t.due_date, t.priority, p.code AS priority_code, t.is_done, t.created_at
-       FROM tasks t
-       JOIN priorities p ON p.id = t.priority
-       WHERE t.id = $1`,
-      [id],
-    );
+    const task = await Task.findByPk(id, {
+      include: [{ model: Priority, as: "priorityData" }],
+    });
 
-    return result.rows.length > 0 ? this.#mapRowToTask(result.rows[0]) : null;
+    return task ? this.#mapTaskToDTO(task) : null;
   }
 
   async add(task) {
-    const client = await pool.connect();
+    const transaction = await sequelize.transaction();
     try {
-      await client.query("BEGIN");
-
       const priorityInt = this.#priorityToInt(task.priority);
-      const result = await client.query(
-        `INSERT INTO tasks (title, due_date, priority, is_done)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id, title, due_date, priority, is_done, created_at,
-           (SELECT code FROM priorities WHERE id = priority) AS priority_code`,
-        [task.title, task.date || null, priorityInt, false],
+      const newTask = await Task.create(
+        {
+          title: task.title,
+          dueDate: task.date || null,
+          priority: priorityInt,
+          isDone: false,
+        },
+        { transaction },
       );
 
-      await client.query("COMMIT");
-      return this.#mapRowToTask(result.rows[0]);
+      await transaction.commit();
+
+      const createdTask = await Task.findByPk(newTask.id, {
+        include: [{ model: Priority, as: "priorityData" }],
+      });
+
+      return this.#mapTaskToDTO(createdTask);
     } catch (error) {
-      await client.query("ROLLBACK");
+      await transaction.rollback();
       throw error;
-    } finally {
-      client.release();
     }
   }
 
   async update(id, updates) {
-    const fields = [];
-    const values = [];
-    let paramCount = 1;
-
-    if (updates.title !== undefined) {
-      fields.push(`title = $${paramCount++}`);
-      values.push(updates.title);
-    }
-
-    if (updates.date !== undefined) {
-      fields.push(`due_date = $${paramCount++}`);
-      values.push(updates.date || null);
-    }
-
-    if (updates.priority !== undefined) {
-      fields.push(`priority = $${paramCount++}`);
-      values.push(this.#priorityToInt(updates.priority));
-    }
-
-    if (updates.completed !== undefined) {
-      fields.push(`is_done = $${paramCount++}`);
-      values.push(updates.completed);
-    }
-    const client = await pool.connect();
+    const transaction = await sequelize.transaction();
     try {
-      await client.query("BEGIN");
+      const updateData = {};
 
-      if (fields.length === 0) {
-        await client.query("ROLLBACK");
-        const existing = await client.query(
-          `SELECT t.id, t.title, t.due_date, t.priority, p.code AS priority_code, t.is_done, t.created_at
-           FROM tasks t
-           JOIN priorities p ON p.id = t.priority
-           WHERE t.id = $1`,
-          [id],
-        );
-        return existing.rows.length > 0
-          ? this.#mapRowToTask(existing.rows[0])
-          : null;
+      if (updates.title !== undefined) {
+        updateData.title = updates.title;
       }
 
-      values.push(id);
-      const query = `UPDATE tasks
-        SET ${fields.join(", ")}
-        WHERE id = $${paramCount}
-        RETURNING id, title, due_date, priority, is_done, created_at,
-          (SELECT code FROM priorities WHERE id = priority) AS priority_code`;
+      if (updates.date !== undefined) {
+        updateData.dueDate = updates.date || null;
+      }
 
-      const result = await client.query(query, values);
+      if (updates.priority !== undefined) {
+        updateData.priority = this.#priorityToInt(updates.priority);
+      }
 
-      await client.query("COMMIT");
-      return result.rows.length > 0 ? this.#mapRowToTask(result.rows[0]) : null;
+      if (updates.completed !== undefined) {
+        updateData.isDone = updates.completed;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        const existingTask = await Task.findByPk(id, {
+          include: [{ model: Priority, as: "priorityData" }],
+        });
+        await transaction.rollback();
+        return existingTask ? this.#mapTaskToDTO(existingTask) : null;
+      }
+
+      const [affectedCount] = await Task.update(updateData, {
+        where: { id },
+        transaction,
+      });
+
+      if (affectedCount === 0) {
+        await transaction.rollback();
+        return null;
+      }
+
+      await transaction.commit();
+
+      const updatedTask = await Task.findByPk(id, {
+        include: [{ model: Priority, as: "priorityData" }],
+      });
+
+      return this.#mapTaskToDTO(updatedTask);
     } catch (error) {
-      await client.query("ROLLBACK");
+      await transaction.rollback();
       throw error;
-    } finally {
-      client.release();
     }
   }
 
   async rescheduleOverdue(maxPerDay = 3, windowDays = 14) {
-    const client = await pool.connect();
+    const transaction = await sequelize.transaction();
     try {
-      await client.query("BEGIN");
+      const today = new Date().toISOString().split("T")[0];
 
-      const overdue = await client.query(
-        `SELECT t.id, t.title, t.due_date, t.priority, p.code AS priority_code, t.is_done, t.created_at
-         FROM tasks t
-         JOIN priorities p ON p.id = t.priority
-         WHERE due_date < CURRENT_DATE AND is_done = false
-         ORDER BY p.weight DESC, due_date ASC`,
-      );
+      const overdue = await Task.findAll({
+        where: {
+          dueDate: {
+            [Op.lt]: today,
+          },
+          isDone: false,
+        },
+        attributes: [
+          "id",
+          "title",
+          "dueDate",
+          "priority",
+          "isDone",
+          "createdAt",
+        ],
+        include: [{ model: Priority, as: "priorityData" }],
+        order: [
+          [{ model: Priority, as: "priorityData" }, "weight", "DESC"],
+          ["dueDate", "ASC"],
+        ],
+        transaction,
+      });
 
-      if (overdue.rows.length === 0) {
-        await client.query("COMMIT");
+      if (overdue.length === 0) {
+        await transaction.commit();
         return [];
       }
 
+      const windowEnd = new Date();
+      windowEnd.setDate(windowEnd.getDate() + windowDays);
+      const windowEndDate = windowEnd.toISOString().split("T")[0];
+
       // Snapshot of how many tasks are already filling each future day.
-      const existing = await client.query(
-        `SELECT due_date::date AS day, COUNT(*)::int AS count
-         FROM tasks
-         WHERE due_date >= CURRENT_DATE
-           AND due_date < CURRENT_DATE + $1::int
-           AND is_done = false
-         GROUP BY due_date::date`,
-        [windowDays],
-      );
+      const existing = await Task.findAll({
+        attributes: [
+          "dueDate",
+          [sequelize.fn("COUNT", sequelize.col("id")), "count"],
+        ],
+        where: {
+          dueDate: {
+            [Op.gte]: today,
+            [Op.lt]: windowEndDate,
+          },
+          isDone: false,
+        },
+        group: ["dueDate"],
+        raw: true,
+        transaction,
+      });
 
       const slotMap = new Map(
-        existing.rows.map((r) => [r.day.toISOString().split("T")[0], r.count]),
+        existing.map((r) => {
+          return [this.#dateToDateOnly(r.dueDate), Number(r.count)];
+        }),
       );
 
       const updated = [];
-      for (const row of overdue.rows) {
+      for (const row of overdue) {
         // Find the nearest future day within the window that still has capacity.
         // Each placement updates slotMap so subsequent tasks see accurate counts.
         let targetDate = null;
@@ -189,59 +223,57 @@ export class TaskRepo {
         // The throw triggers ROLLBACK, undoing every placement made so far.
         if (!targetDate) {
           const err = new Error(
-            `Capacity exceeded: cannot fit all ${overdue.rows.length} overdue tasks ` +
+            `Capacity exceeded: cannot fit all ${overdue.length} overdue tasks ` +
               `within ${windowDays} days at ${maxPerDay} tasks/day. No tasks were rescheduled.`,
           );
           err.status = 422;
           throw err;
         }
 
-        const result = await client.query(
-          `UPDATE tasks
-           SET due_date = $1,
-             priority = (
-               SELECT next_priority.id
-               FROM priorities current_priority
-               JOIN priorities next_priority
-                 ON next_priority.weight = LEAST(current_priority.weight + 1, 3)
-               WHERE current_priority.id = tasks.priority
-           )
-           WHERE id = $2
-           RETURNING id, title, due_date, priority, is_done, created_at,
-             (SELECT code FROM priorities WHERE id = priority) AS priority_code`,
-          [targetDate, row.id],
+        const currentPriorityWeight = row.priorityData?.weight ?? 1;
+        const nextPriorityWeight = Math.min(currentPriorityWeight + 1, 3);
+        const nextPriority = await Priority.findOne({
+          where: { weight: nextPriorityWeight },
+          transaction,
+        });
+
+        await row.update(
+          {
+            dueDate: targetDate,
+            priority: nextPriority?.id ?? row.priority,
+          },
+          { transaction },
         );
 
-        updated.push(this.#mapRowToTask(result.rows[0]));
+        const updatedTask = await Task.findByPk(row.id, {
+          include: [{ model: Priority, as: "priorityData" }],
+          transaction,
+        });
+
+        updated.push(this.#mapTaskToDTO(updatedTask));
       }
 
-      await client.query("COMMIT");
+      await transaction.commit();
       return updated;
     } catch (error) {
-      await client.query("ROLLBACK");
+      await transaction.rollback();
       throw error;
-    } finally {
-      client.release();
     }
   }
 
   async delete(id) {
-    const client = await pool.connect();
+    const transaction = await sequelize.transaction();
     try {
-      await client.query("BEGIN");
+      const result = await Task.destroy({
+        where: { id },
+        transaction,
+      });
 
-      const result = await client.query(
-        `DELETE FROM tasks WHERE id = $1 RETURNING id`,
-        [id],
-      );
-
-      await client.query("COMMIT");
-      return result.rows.length > 0 ? String(result.rows[0].id) : null;
+      await transaction.commit();
+      return result > 0 ? String(id) : null;
     } catch (error) {
-      await client.query("ROLLBACK");
+      await transaction.rollback();
       throw error;
-    } finally {
-      client.release();
     }
   }
 

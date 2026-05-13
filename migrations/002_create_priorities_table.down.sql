@@ -1,6 +1,0 @@
-ALTER TABLE tasks
-    DROP CONSTRAINT IF EXISTS tasks_priority_fkey,
-    ALTER COLUMN priority DROP NOT NULL,
-    ALTER COLUMN priority SET DEFAULT 1;
-
-DROP TABLE IF EXISTS priorities;
