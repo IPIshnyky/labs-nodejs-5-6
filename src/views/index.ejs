@@ -9,62 +9,116 @@
     <main>
       <h1>Dashboard</h1>
 
-      <% 
-        const getSortLink = (label, field) => {
-          const isCurrent = currentSort === field;
-          const nextOrder = isCurrent && currentOrder === 'asc' ? 'desc' : 'asc';
-          const icon = isCurrent ? (currentOrder === 'asc' ? '▲' : '▼') : '↕';
-          return `<a href="/?sort=${field}&order=${nextOrder}" class="sort-link">${label} ${icon}</a>`;
-        }
-      %>
+      <p id="empty-state" hidden>No tasks yet.</p>
 
-      <% if (tasks.length === 0) { %>
-        <p>No tasks yet.</p>
-      <% } else { %>
-        <table class="task-table">
-          <thead>
-            <tr>
-              <th><%- getSortLink('Title', 'title') %></th>
-              <th><%- getSortLink('Date', 'date') %></th>
-              <th><%- getSortLink('Priority', 'priority') %></th>
-              <th><%- getSortLink('Status', 'status') %></th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% tasks.forEach(task => { %>
-              <tr class="<%= task.completed ? 'row-done' : '' %>">
-                <td><%= task.title %></td>
-                <td><%= task.date %></td>
-                <td>
-                  <span class="badge badge-<%= task.priority %>"><%= task.priority %></span>
-                </td>
-                <td><%= task.completed ? 'Done' : 'Pending' %></td>
-                <td>
-                  <div class="actions">
-                    <form method="POST" action="/tasks/<%= task.id %>/toggle" style="display:inline;">
-                      <button type ="submit">
-                        <%= task.completed ? 'Undo' : 'Complete' %>
-                      </button>
-                    </form>
-                     <a href="/tasks/<%= task.id %>/edit">Edit</a>
-                      <form method="POST" action="/tasks/<%= task.id %>/delete" style="display:inline;">
-                        <button type="submit">Delete</button>
-                      </form>
-                  </div>
-                </td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      <% } %>
+      <table class="task-table" id="task-table" hidden>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Date</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="task-list"></tbody>
+      </table>
 
       <a href="/tasks/new" class="btn">+ New Task</a>
       <a href="/tasks/reschedule-overdue" class="btn">Reschedule Overdue</a>
-      <% if (currentSort) { %>
-        <a href="/" class="btn">Reset sorting</a>
-      <% } %>
     </main>
+
+    <script>
+      const tableEl = document.getElementById("task-table");
+      const listEl = document.getElementById("task-list");
+      const emptyEl = document.getElementById("empty-state");
+
+      const escapeHtml = (value) => {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      };
+
+      const requestJson = async (url, options = {}) => {
+        const response = await fetch(url, {
+          headers: { "Content-Type": "application/json" },
+          ...options,
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || "Request failed");
+        }
+
+        if (response.status === 204) return null;
+        return response.json();
+      };
+
+      const renderTasks = (tasks) => {
+        emptyEl.hidden = tasks.length !== 0;
+        tableEl.hidden = tasks.length === 0;
+
+        listEl.innerHTML = tasks
+          .map((task) => {
+            const title = escapeHtml(task.title);
+            const date = escapeHtml(task.date);
+            const priority = escapeHtml(task.priority);
+            const status = task.completed ? "Done" : "Pending";
+            const action = task.completed ? "Undo" : "Complete";
+
+            return `
+              <tr class="${task.completed ? "row-done" : ""}">
+                <td>${title}</td>
+                <td>${date}</td>
+                <td><span class="badge badge-${priority}">${priority}</span></td>
+                <td>${status}</td>
+                <td>
+                  <div class="actions">
+                    <button type="button" data-action="toggle" data-id="${task.id}" data-completed="${task.completed}">${action}</button>
+                    <a href="/tasks/${task.id}/edit">Edit</a>
+                    <button type="button" data-action="delete" data-id="${task.id}">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
+      };
+
+      const loadTasks = async () => {
+        const tasks = await requestJson("/api/tasks");
+        renderTasks(tasks);
+      };
+
+      listEl.addEventListener("click", async (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button) return;
+
+        const id = button.dataset.id;
+        if (button.dataset.action === "toggle") {
+          await requestJson(`/api/tasks/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              completed: button.dataset.completed !== "true",
+            }),
+          });
+        }
+
+        if (button.dataset.action === "delete") {
+          await requestJson(`/api/tasks/${id}`, { method: "DELETE" });
+        }
+
+        await loadTasks();
+      });
+
+      loadTasks().catch((error) => {
+        emptyEl.hidden = false;
+        emptyEl.textContent = error.message;
+      });
+    </script>
 
     <%- include('partials/footer') %>
   </body>

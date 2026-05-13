@@ -8,7 +8,7 @@
   <body>
     <main>
       <h1>New Task</h1>
-      <form action="/tasks" method="POST" class="form-card">
+      <form id="task-form" class="form-card">
         <div class="form-row">
           <label for="title" class="form-label">Title</label>
           <input
@@ -49,7 +49,6 @@
       </form>
     </main>
     <script>
-      // Auto-fill date input with today's date (YYYY-MM-DD) when creating a new task
       document.addEventListener("DOMContentLoaded", function () {
         try {
           var dateEl = document.getElementById("date");
@@ -64,6 +63,27 @@
           // No-op if DOM access fails
         }
       });
+
+      document
+        .getElementById("task-form")
+        .addEventListener("submit", async function (event) {
+          event.preventDefault();
+
+          const formData = new FormData(event.currentTarget);
+          const response = await fetch("/api/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(Object.fromEntries(formData)),
+          });
+
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            alert(payload.error || "Failed to create task");
+            return;
+          }
+
+          window.location.href = "/";
+        });
     </script>
     <%- include('partials/footer') %>
   </body>
