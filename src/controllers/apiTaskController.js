@@ -5,10 +5,11 @@ export class ApiTaskController {
     this.#service = service;
   }
 
-  getAllTasks = async (_req, res, next) => {
+  getAllTasks = async (req, res, next) => {
     try {
-      const tasks = await this.#service.fetchAllTasks();
-      res.json(tasks);
+      // Pass query params (page, limit, priority, etc.) to service
+      const result = await this.#service.fetchTasksAdvanced(req.query);
+      res.json(result);
     } catch (error) {
       next(error);
     }

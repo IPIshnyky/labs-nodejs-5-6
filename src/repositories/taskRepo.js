@@ -244,4 +244,59 @@ export class TaskRepo {
       client.release();
     }
   }
+
+  async getWithFilters({
+    page = 1,
+    limit = 10,
+    priority,
+    completed,
+    dateFrom,
+    dateTo,
+  }) {
+    const offset = (page - 1) * limit;
+    const params = [];
+    const filters = [];
+    let paramIndex = 1;
+
+    if (priority) {
+      filters.push(`p.code = $${paramIndex++}`);
+      params.push(priority);
+    }
+    if (completed !== undefined) {
+      filters.push(`t.is_done = $${paramIndex++}`);
+      params.push(completed === "true" || completed === true);
+    }
+    if (dateFrom) {
+      filters.push(`t.due_date >= $${paramIndex++}`);
+      params.push(dateFrom);
+    }
+    if (dateTo) {
+      filters.push(`t.due_date <= $${paramIndex++}`);
+      params.push(dateTo);
+    }
+
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+
+    // Get data
+    const dataQuery = `
+        SELECT t.id, t.title, t.due_date, t.priority, p.code AS priority_code, t.is_done, t.created_at
+        FROM tasks t
+        JOIN priorities p ON p.id = t.priority
+        ${whereClause}
+        ORDER BY t.created_at DESC
+        LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+
+    const dataParams = [...params, limit, offset];
+    const result = await pool.query(dataQuery, dataParams);
+
+    // Get total count for pagination
+    const countQuery = `SELECT COUNT(*) FROM tasks t JOIN priorities p ON p.id = t.priority ${whereClause}`;
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].count, 10);
+
+    return {
+      tasks: result.rows.map((row) => this.#mapRowToTask(row)),
+      total,
+    };
+  }
 }

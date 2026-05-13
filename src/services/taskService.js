@@ -181,4 +181,25 @@ export class TaskService {
         return sortedTasks;
     }
   }
+
+  async fetchTasksAdvanced(query) {
+    const page = parseInt(query.page) || 1;
+    const limit = parseInt(query.limit) || 10;
+
+    const { tasks, total } = await this.#repo.getWithFilters({
+      ...query,
+      page,
+      limit,
+    });
+
+    return {
+      data: tasks,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 }
