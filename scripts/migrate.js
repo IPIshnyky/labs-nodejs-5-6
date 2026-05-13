@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from "fs";
 import path from "path";
-import pool from "../src/db/index.js";
+import sequelize from "../src/db/index.js";
 
 const cmd = process.argv[2] || "up";
 const migrationsDir = path.resolve("migrations");
@@ -17,7 +17,7 @@ function getMigrations(suffix) {
 async function runSqlFile(filePath) {
   const sql = fs.readFileSync(filePath, "utf-8");
   try {
-    await pool.query(sql);
+    await sequelize.query(sql);
     console.log(`Executed: ${path.basename(filePath)}`);
   } catch (err) {
     console.error(`Error executing ${path.basename(filePath)}:`, err);
@@ -49,6 +49,6 @@ async function runSqlFile(filePath) {
     console.error(e);
     process.exit(1);
   } finally {
-    await pool.end();
+    await sequelize.close();
   }
 })();

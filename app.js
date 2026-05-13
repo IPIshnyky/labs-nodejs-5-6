@@ -6,6 +6,7 @@ import { TaskRepo } from "./src/repositories/taskRepo.js";
 import { TaskService } from "./src/services/taskService.js";
 import { TaskController } from "./src/controllers/taskController.js";
 import { ApiTaskController } from "./src/controllers/apiTaskController.js";
+import { sequelize } from "./src/models/index.js";
 
 // Dependency injection composition root
 const taskRepo = new TaskRepo();
@@ -55,9 +56,8 @@ app.use((err, _req, res, _next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+
+let server;
 
 const shutdown = (signal) => {
   return (err) => {
@@ -68,11 +68,19 @@ const shutdown = (signal) => {
     }
 
     // Stop accepting new connections
-    server.close((closeErr) => {
+    server.close(async (closeErr) => {
       if (closeErr) {
         console.error("Error during server close", closeErr);
         process.exit(1);
       }
+
+      try {
+        await sequelize.close();
+        console.log("Database connection closed.");
+      } catch (dbErr) {
+        console.error("Error closing database connection:", dbErr);
+      }
+
       console.log("Closed remaining connections, exiting.");
       process.exit(0);
     });
@@ -85,13 +93,27 @@ const shutdown = (signal) => {
   };
 };
 
-process.on("SIGTERM", shutdown("SIGTERM"));
-process.on("SIGINT", shutdown("SIGINT"));
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught Exception:", err);
-  shutdown("uncaughtException")(err);
-});
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled Rejection:", reason);
-  shutdown("unhandledRejection")(reason);
-});
+(async () => {
+  try {
+    await sequelize.authenticate();
+    console.log("Database connection established successfully.");
+
+    server = app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+
+    process.on("SIGTERM", shutdown("SIGTERM"));
+    process.on("SIGINT", shutdown("SIGINT"));
+    process.on("uncaughtException", (err) => {
+      console.error("Uncaught Exception:", err);
+      shutdown("uncaughtException")(err);
+    });
+    process.on("unhandledRejection", (reason) => {
+      console.error("Unhandled Rejection:", reason);
+      shutdown("unhandledRejection")(reason);
+    });
+  } catch (error) {
+    console.error("Failed to initialize application:", error);
+    process.exit(1);
+  }
+})();
