@@ -10,8 +10,7 @@ export class TaskService {
   }
 
   async flipCompletionStatus(id) {
-    const tasks = await this.#repo.getAll(); //
-    const task = tasks.find((t) => t.id === id);
+    const task = await this.#repo.getById(id);
 
     if (!task) {
       const err = new Error("Task not found");
@@ -45,29 +44,15 @@ export class TaskService {
       throw err;
     }
 
-    const tasks = await this.#repo.getAll();
-    const maxId = Array.isArray(tasks)
-      ? tasks.reduce((max, task) => {
-          const n = Number(task.id);
-          return Number.isFinite(n) ? Math.max(max, n) : max;
-        }, 0)
-      : 0;
-
-    const newTask = {
-      id: String(maxId + 1),
+    return await this.#repo.add({
       title,
       date,
       priority,
-      completed: false,
-    };
-
-    await this.#repo.add(newTask);
-    return newTask;
+    });
   }
 
   async getTaskById(id) {
-    const tasks = await this.#repo.getAll();
-    const task = tasks.find((t) => t.id === id);
+    const task = await this.#repo.getById(id);
 
     if (!task) {
       const err = new Error("Task not found");
