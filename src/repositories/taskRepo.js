@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, Transaction } from "sequelize";
 
 import sequelize from "../db/index.js";
 import { Task, Priority } from "../models/index.js";
@@ -275,5 +275,69 @@ export class TaskRepo {
       await transaction.rollback();
       throw error;
     }
+  }
+
+  async getWithFilters({
+    page = 1,
+    limit = 10,
+    priority,
+    completed,
+    dateFrom,
+    dateTo,
+  }) {
+    const offset = (page - 1) * limit;
+    const taskWhere = {};
+    const priorityInclude = {
+      model: Priority,
+      as: "priorityData",
+      required: true,
+    };
+
+    if (priority) {
+      priorityInclude.where = { code: priority };
+    }
+
+    if (completed !== undefined) {
+      taskWhere.isDone = completed;
+    }
+
+    if (dateFrom) {
+      taskWhere.dueDate = {
+        ...(taskWhere.dueDate ?? {}),
+        [Op.gte]: dateFrom,
+      };
+    }
+
+    if (dateTo) {
+      taskWhere.dueDate = {
+        ...(taskWhere.dueDate ?? {}),
+        [Op.lte]: dateTo,
+      };
+    }
+
+    return sequelize.transaction(
+      { isolationLevel: Transaction.ISOLATION_LEVELS.REPEATABLE_READ },
+      async (transaction) => {
+        const tasks = await Task.findAll({
+          where: taskWhere,
+          include: [priorityInclude],
+          order: [["createdAt", "DESC"]],
+          limit,
+          offset,
+          transaction,
+        });
+
+        const total = await Task.count({
+          where: taskWhere,
+          include: [priorityInclude],
+          transaction,
+        });
+
+        return {
+          tasks: tasks.map((task) => this.#mapTaskToDTO(task)),
+          total,
+        };
+      },
+    );
   }
 }
