@@ -10,6 +10,8 @@ const config = {
   url: databaseUrl,
   dialect: "postgres",
   logging: false,
+  seederStorage: "sequelize",
+  seederStorageTableName: "SequelizeData",
 };
 
 module.exports = {
