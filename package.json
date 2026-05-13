@@ -12,6 +12,9 @@
     "migrate:up": "node scripts/migrate.js up",
     "migrate:down": "node scripts/migrate.js down",
     "migrate:refresh": "node scripts/migrate.js refresh",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:migrate:status": "sequelize-cli db:migrate:status",
     "seed": "node scripts/seed.js",
     "ci": "npm run migrate:up && npm run seed && npm test"
   },
@@ -41,6 +44,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "nodemon": "^3.1.13",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "sequelize-cli": "^6.6.5"
   }
 }
