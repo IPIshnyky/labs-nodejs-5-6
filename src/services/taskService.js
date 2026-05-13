@@ -168,8 +168,20 @@ export class TaskService {
   }
 
   async fetchTasksAdvanced(query) {
-    const page = parseInt(query.page) || 1;
-    const limit = parseInt(query.limit) || 10;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    if (!Number.isInteger(page) || page < 1) {
+      const err = new Error("Page must be a positive integer");
+      err.status = 400;
+      throw err;
+    }
+
+    if (!Number.isInteger(limit) || limit < 1) {
+      const err = new Error("Limit must be a positive integer");
+      err.status = 400;
+      throw err;
+    }
 
     const { tasks, total } = await this.#repo.getWithFilters({
       ...query,

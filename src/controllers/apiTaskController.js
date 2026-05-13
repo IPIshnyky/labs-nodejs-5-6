@@ -1,3 +1,5 @@
+import { parseBoolean, parsePositiveInteger } from "../utils/queryParsers.js";
+
 export class ApiTaskController {
   #service;
 
@@ -5,10 +7,21 @@ export class ApiTaskController {
     this.#service = service;
   }
 
+  #buildTaskListQueryDto(query) {
+    return {
+      page: parsePositiveInteger(query.page, "page", 1),
+      limit: parsePositiveInteger(query.limit, "limit", 10),
+      priority: query.priority,
+      completed: parseBoolean(query.completed),
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    };
+  }
+
   getAllTasks = async (req, res, next) => {
     try {
-      // Pass query params (page, limit, priority, etc.) to service
-      const result = await this.#service.fetchTasksAdvanced(req.query);
+      const taskListQueryDto = this.#buildTaskListQueryDto(req.query);
+      const result = await this.#service.fetchTasksAdvanced(taskListQueryDto);
       res.json(result);
     } catch (error) {
       next(error);
