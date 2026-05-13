@@ -1,7 +1,7 @@
 import { DataTypes } from "sequelize";
 
 export default (sequelize) => {
-  return sequelize.define(
+  const Priority = sequelize.define(
     "Priority",
     {
       id: {
@@ -29,4 +29,10 @@ export default (sequelize) => {
       timestamps: false,
     },
   );
+
+  Priority.associate = (models) => {
+    Priority.hasMany(models.Task, { foreignKey: "priority", as: "tasks" });
+  };
+
+  return Priority;
 };

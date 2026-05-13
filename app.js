@@ -6,7 +6,7 @@ import { TaskRepo } from "./src/repositories/taskRepo.js";
 import { TaskService } from "./src/services/taskService.js";
 import { TaskController } from "./src/controllers/taskController.js";
 import { ApiTaskController } from "./src/controllers/apiTaskController.js";
-import { sequelize } from "./src/models/index.js";
+import sequelize from "./src/db/index.js";
 
 // Dependency injection composition root
 const taskRepo = new TaskRepo();

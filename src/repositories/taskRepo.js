@@ -1,6 +1,7 @@
 import { Op } from "sequelize";
 
-import { Task, Priority, sequelize } from "../models/index.js";
+import sequelize from "../db/index.js";
+import { Task, Priority } from "../models/index.js";
 
 export class TaskRepo {
   #mapTaskToDTO(taskInstance) {
@@ -155,7 +156,7 @@ export class TaskRepo {
         ],
         include: [{ model: Priority, as: "priorityData" }],
         order: [
-          [sequelize.col("priorityData.weight"), "DESC"],
+          [{ model: Priority, as: "priorityData" }, "weight", "DESC"],
           ["dueDate", "ASC"],
         ],
         transaction,
@@ -170,6 +171,7 @@ export class TaskRepo {
       windowEnd.setDate(windowEnd.getDate() + windowDays);
       const windowEndDate = windowEnd.toISOString().split("T")[0];
 
+      // Snapshot of how many tasks are already filling each future day.
       const existing = await Task.findAll({
         attributes: [
           "dueDate",
@@ -197,6 +199,8 @@ export class TaskRepo {
 
       const updated = [];
       for (const row of overdue) {
+        // Find the nearest future day within the window that still has capacity.
+        // Each placement updates slotMap so subsequent tasks see accurate counts.
         let targetDate = null;
         for (let d = 1; d <= windowDays; d++) {
           const candidate = new Date();
@@ -209,14 +213,15 @@ export class TaskRepo {
           }
         }
 
+        // Business logic abort: backlog exceeds planning capacity.
+        // The throw triggers ROLLBACK, undoing every placement made so far.
         if (!targetDate) {
           const err = new Error(
             `Capacity exceeded: cannot fit all ${overdue.length} overdue tasks ` +
               `within ${windowDays} days at ${maxPerDay} tasks/day. No tasks were rescheduled.`,
           );
           err.status = 422;
-          await transaction.rollback();
-          return Promise.reject(err);
+          throw err;
         }
 
         const currentPriorityWeight = row.priorityData?.weight ?? 1;

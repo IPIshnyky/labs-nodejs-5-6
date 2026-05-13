@@ -1,7 +1,7 @@
 import { DataTypes } from "sequelize";
 
 export default (sequelize) => {
-  return sequelize.define(
+  const Task = sequelize.define(
     "Task",
     {
       id: {
@@ -45,4 +45,13 @@ export default (sequelize) => {
       timestamps: false,
     },
   );
+
+  Task.associate = (models) => {
+    Task.belongsTo(models.Priority, {
+      foreignKey: "priority",
+      as: "priorityData",
+    });
+  };
+
+  return Task;
 };

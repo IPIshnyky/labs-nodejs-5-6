@@ -1,11 +1,17 @@
-import sequelize from "../config/sequelize.js";
+import sequelize from "../db/index.js";
 import PriorityModel from "./Priority.js";
 import TaskModel from "./Task.js";
 
-const Priority = PriorityModel(sequelize);
-const Task = TaskModel(sequelize);
+const models = {
+  Priority: PriorityModel(sequelize),
+  Task: TaskModel(sequelize),
+};
 
-Priority.hasMany(Task, { foreignKey: "priority", as: "tasks" });
-Task.belongsTo(Priority, { foreignKey: "priority", as: "priorityData" });
+for (const model of Object.values(models)) {
+  model.associate?.(models);
+}
 
-export { Priority, Task, sequelize };
+const { Priority, Task } = models;
+
+export { Priority, Task };
+export default models;
