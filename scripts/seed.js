@@ -56,16 +56,16 @@ function loadSeeder(file) {
   return require(path.join(seedersDir, file));
 }
 
-async function runSeeder(file, direction) {
+async function runSeeder(file, direction, { updateMeta = true } = {}) {
   const seeder = loadSeeder(file);
   const transaction = await sequelize.transaction();
 
   try {
-    await seeder[direction](queryInterface, Sequelize);
+    await seeder[direction](queryInterface, Sequelize, transaction);
 
-    if (direction === "up") {
+    if (direction === "up" && updateMeta) {
       await markApplied(file, transaction);
-    } else {
+    } else if (direction === "down" && updateMeta) {
       await unmarkApplied(file, transaction);
     }
 
@@ -86,9 +86,7 @@ async function runSeeder(file, direction) {
     if (cmd === "up") {
       console.log("SEED UP");
       for (const file of seeders) {
-        if (!applied.has(file)) {
-          await runSeeder(file, "up");
-        }
+        await runSeeder(file, "up", { updateMeta: !applied.has(file) });
       }
     } else if (cmd === "down") {
       console.log("SEED DOWN");

@@ -58,21 +58,29 @@ const tasks = [
 const taskTitles = tasks.map((task) => task.title);
 
 module.exports = {
-  async up(queryInterface, Sequelize) {
-    await queryInterface.bulkDelete("tasks", {
-      title: {
-        [Sequelize.Op.in]: taskTitles,
+  async up(queryInterface, Sequelize, transaction) {
+    await queryInterface.bulkDelete(
+      "tasks",
+      {
+        title: {
+          [Sequelize.Op.in]: taskTitles,
+        },
       },
-    });
+      { transaction },
+    );
 
-    await queryInterface.bulkInsert("tasks", tasks);
+    await queryInterface.bulkInsert("tasks", tasks, { transaction });
   },
 
-  async down(queryInterface, Sequelize) {
-    await queryInterface.bulkDelete("tasks", {
-      title: {
-        [Sequelize.Op.in]: taskTitles,
+  async down(queryInterface, Sequelize, transaction) {
+    await queryInterface.bulkDelete(
+      "tasks",
+      {
+        title: {
+          [Sequelize.Op.in]: taskTitles,
+        },
       },
-    });
+      { transaction },
+    );
   },
 };
