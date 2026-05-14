@@ -9,13 +9,13 @@
     <main>
       <h1>Reschedule Overdue Tasks</h1>
 
-      <% if (error) { %>
-        <div class="alert-error">
-          <strong>Error:</strong> <%= error %>
-        </div>
-      <% } %>
+      <div class="alert-error" id="error-message" hidden></div>
 
-      <form action="/tasks/reschedule-overdue" method="POST" class="form-card">
+      <form
+        id="reschedule-form"
+        data-api-url="/api/tasks/reschedule-overdue"
+        class="form-card"
+      >
         <div class="form-row">
           <label for="maxPerDay" class="form-label">Max tasks per day</label>
           <input
@@ -44,11 +44,50 @@
         </div>
 
         <div class="form-actions">
-          <button class="btn primary" type="submit">Reschedule</button>
+          <button class="btn primary" type="button" id="reschedule-button">
+            Reschedule
+          </button>
           <a href="/" class="btn">Cancel</a>
         </div>
       </form>
     </main>
+
+    <script>
+      const formEl = document.getElementById("reschedule-form");
+      const buttonEl = document.getElementById("reschedule-button");
+      const errorEl = document.getElementById("error-message");
+
+      const submitReschedule = async () => {
+        if (!formEl.reportValidity()) return;
+
+        errorEl.hidden = true;
+
+        const formData = new FormData(formEl);
+        const response = await fetch(formEl.dataset.apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.fromEntries(formData)),
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          errorEl.textContent = payload.error || "Failed to reschedule tasks";
+          errorEl.hidden = false;
+          return;
+        }
+
+        window.location.href = "/";
+      };
+
+      formEl.addEventListener("submit", (event) => {
+        event.preventDefault();
+        submitReschedule();
+      });
+
+      buttonEl.addEventListener("click", () => {
+        submitReschedule();
+      });
+    </script>
 
     <%- include('partials/footer') %>
   </body>

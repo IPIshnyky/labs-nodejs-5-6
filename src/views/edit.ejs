@@ -8,7 +8,7 @@
   <body>
     <main>
       <h1>Edit Task</h1>
-      <form action="/tasks/<%= task.id %>/update" method="POST" class="form-card">
+      <form id="task-form" class="form-card">
         <div class="form-row">
           <label for="title" class="form-label">Title</label>
           <input
@@ -16,7 +16,6 @@
             type="text"
             id="title"
             name="title"
-            value="<%= task.title %>"
             autofocus
             required
           />
@@ -29,7 +28,6 @@
             type="date"
             id="date"
             name="date"
-            value="<%= task.date %>"
             required
           />
         </div>
@@ -37,15 +35,15 @@
         <div class="form-row">
           <label for="priority" class="form-label">Priority</label>
           <select class="form-select" id="priority" name="priority">
-            <option value="low" <%= task.priority === 'low' ? 'selected' : '' %>>Low</option>
-            <option value="medium" <%= task.priority === 'medium' ? 'selected' : '' %>>Medium</option>
-            <option value="high" <%= task.priority === 'high' ? 'selected' : '' %>>High</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
           </select>
         </div>
 
         <div class="form-row">
           <label class="form-label">
-            <input type="checkbox" name="completed" value="true" <%= task.completed ? 'checked' : '' %> />
+            <input type="checkbox" id="completed" name="completed" />
             Completed
           </label>
         </div>
@@ -56,21 +54,65 @@
         </div>
       </form>
     </main>
+
     <script>
-      // Focus and select the full title on load so editing replaces the whole text
-      document.addEventListener('DOMContentLoaded', function () {
+      const taskId = "<%= taskId %>";
+      const formEl = document.getElementById("task-form");
+      const titleEl = document.getElementById("title");
+      const dateEl = document.getElementById("date");
+      const priorityEl = document.getElementById("priority");
+      const completedEl = document.getElementById("completed");
+
+      const requestJson = async (url, options = {}) => {
+        const response = await fetch(url, {
+          headers: { "Content-Type": "application/json" },
+          ...options,
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || "Request failed");
+        }
+
+        return response.json();
+      };
+
+      const loadTask = async () => {
+        const task = await requestJson(`/api/tasks/${taskId}`);
+        titleEl.value = task.title;
+        dateEl.value = task.date;
+        priorityEl.value = task.priority;
+        completedEl.checked = task.completed;
+        titleEl.focus();
+        titleEl.select();
+      };
+
+      formEl.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
         try {
-          var titleEl = document.getElementById('title');
-          if (titleEl) {
-            titleEl.focus();
-            if (typeof titleEl.select === 'function') titleEl.select();
-          }
-        } catch (e) {
-          // no-op
+          await requestJson(`/api/tasks/${taskId}`, {
+            method: "PUT",
+            body: JSON.stringify({
+              title: titleEl.value,
+              date: dateEl.value,
+              priority: priorityEl.value,
+              completed: completedEl.checked,
+            }),
+          });
+
+          window.location.href = "/";
+        } catch (error) {
+          alert(error.message);
         }
       });
+
+      loadTask().catch((error) => {
+        alert(error.message);
+        window.location.href = "/";
+      });
     </script>
-    </main>
+
     <%- include('partials/footer') %>
   </body>
 </html>

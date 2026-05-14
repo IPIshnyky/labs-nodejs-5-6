@@ -5,14 +5,12 @@ import path from "path";
 import { TaskRepo } from "./src/repositories/taskRepo.js";
 import { TaskService } from "./src/services/taskService.js";
 import { TaskController } from "./src/controllers/taskController.js";
-import { ApiTaskController } from "./src/controllers/apiTaskController.js";
 import sequelize from "./src/db/index.js";
 
 // Dependency injection composition root
 const taskRepo = new TaskRepo();
 const taskService = new TaskService(taskRepo);
 const taskController = new TaskController(taskService);
-const apiTaskController = new ApiTaskController(taskService);
 
 const app = express();
 
@@ -25,24 +23,36 @@ app.use(express.static("public"));
 app.set("view engine", "ejs");
 app.set("views", path.join(import.meta.dirname, "src/views"));
 
-app.get("/", taskController.getDashboard);
+app.get("/", (_req, res) => {
+  res.render("index", { page: "home" });
+});
 
-app.get("/tasks/new", taskController.renderCreateForm);
-app.get("/tasks/reschedule-overdue", taskController.renderRescheduleForm);
-app.post("/tasks", taskController.submitNewTask);
-app.post("/tasks/reschedule-overdue", taskController.submitReschedule);
-app.get("/tasks/:id/edit", taskController.renderEditForm);
-app.post("/tasks/:id/update", taskController.submitUpdate);
-app.post("/tasks/:id/toggle", taskController.toggleTaskStatus);
-app.post("/tasks/:id/delete", taskController.deleteTask);
+app.get("/tasks/new", (_req, res) => {
+  res.render("create", { page: "create" });
+});
+
+app.get("/tasks/reschedule-overdue", (_req, res) => {
+  res.render("reschedule", {
+    page: "reschedule",
+    values: { maxPerDay: 3, windowDays: 14 },
+  });
+});
+
+app.get("/tasks/:id/edit", (req, res) => {
+  res.render("edit", { page: "edit", taskId: req.params.id });
+});
 
 // API Routes
-app.get("/api/tasks", apiTaskController.getAllTasks);
-app.get("/api/tasks/:id", apiTaskController.getTask);
-app.post("/api/tasks", apiTaskController.createTask);
-app.put("/api/tasks/:id", apiTaskController.updateTask);
-app.patch("/api/tasks/:id", apiTaskController.patchTask);
-app.delete("/api/tasks/:id", apiTaskController.deleteTask);
+app.get("/api/tasks", taskController.getAllTasks);
+app.post("/api/tasks", taskController.createTask);
+app.post(
+  "/api/tasks/reschedule-overdue",
+  taskController.rescheduleOverdueTasks,
+);
+app.get("/api/tasks/:id", taskController.getTask);
+app.put("/api/tasks/:id", taskController.updateTask);
+app.patch("/api/tasks/:id", taskController.patchTask);
+app.delete("/api/tasks/:id", taskController.deleteTask);
 
 app.use((_req, res) => {
   res.status(404).sendFile(path.join(import.meta.dirname, "public/404.html"));

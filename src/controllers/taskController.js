@@ -5,111 +5,87 @@ export class TaskController {
     this.#service = service;
   }
 
-  getDashboard = async (_req, res, next) => {
+  getAllTasks = async (_req, res, next) => {
     try {
       const tasks = await this.#service.fetchAllTasks();
-
-      const sortBy = _req.query.sort;
-      const currentOrder = _req.query.order || "asc";
-
-      const displayTasks = sortBy
-        ? this.#service.sortTasks(tasks, sortBy, currentOrder)
-        : tasks;
-      res.render("index", {
-        page: "home",
-        tasks: displayTasks,
-        currentSort: sortBy,
-        currentOrder: currentOrder,
-      });
+      res.json(tasks);
     } catch (error) {
       next(error);
     }
   };
 
-  renderCreateForm = (_req, res) => {
-    res.render("create", { page: "create" });
-  };
-
-  submitNewTask = async (req, res, next) => {
-    try {
-      await this.#service.createTask({
-        title: req.body.title,
-        date: req.body.date,
-        priority: req.body.priority,
-      });
-
-      res.redirect(303, "/");
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  renderEditForm = async (req, res, next) => {
+  getTask = async (req, res, next) => {
     try {
       const task = await this.#service.getTaskById(req.params.id);
-      res.render("edit", { page: "edit", task });
+      res.json(task);
     } catch (error) {
       next(error);
     }
   };
 
-  submitUpdate = async (req, res, next) => {
+  createTask = async (req, res, next) => {
     try {
-      await this.#service.updateTaskData(req.params.id, {
-        title: req.body.title,
-        date: req.body.date,
-        priority: req.body.priority,
-        completed: req.body.completed,
-      });
-
-      res.redirect(303, "/");
+      const newTask = await this.#service.createTask(req.body);
+      res.status(201).json(newTask);
     } catch (error) {
       next(error);
     }
   };
 
-  toggleTaskStatus = async (req, res, next) => {
+  updateTask = async (req, res, next) => {
     try {
-      await this.#service.flipCompletionStatus(req.params.id);
-      res.redirect(303, "/");
+      const updatedTask = await this.#service.updateTaskData(
+        req.params.id,
+        req.body,
+      );
+      res.json(updatedTask);
     } catch (error) {
       next(error);
     }
   };
 
-  renderRescheduleForm = (_req, res) => {
-    res.render("reschedule", {
-      page: "reschedule",
-      error: null,
-      values: { maxPerDay: 3, windowDays: 14 },
-    });
+  patchTask = async (req, res, next) => {
+    try {
+      const existingTask = await this.#service.getTaskById(req.params.id);
+      const mergedTask = {
+        title:
+          req.body.title !== undefined ? req.body.title : existingTask.title,
+        date: req.body.date !== undefined ? req.body.date : existingTask.date,
+        priority:
+          req.body.priority !== undefined
+            ? req.body.priority
+            : existingTask.priority,
+        completed:
+          req.body.completed !== undefined
+            ? req.body.completed
+            : existingTask.completed,
+      };
+      const updatedTask = await this.#service.updateTaskData(
+        req.params.id,
+        mergedTask,
+      );
+      res.json(updatedTask);
+    } catch (error) {
+      next(error);
+    }
   };
 
-  submitReschedule = async (req, res, next) => {
-    const { maxPerDay, windowDays } = req.body;
+  rescheduleOverdueTasks = async (req, res, next) => {
     try {
-      await this.#service.rescheduleOverdueTasks(maxPerDay, windowDays);
-      res.redirect(303, "/");
+      const updatedTasks = await this.#service.rescheduleOverdueTasks(
+        req.body.maxPerDay,
+        req.body.windowDays,
+      );
+      res.json(updatedTasks);
     } catch (error) {
-      if (error.status && error.status < 500) {
-        res.render("reschedule", {
-          page: "reschedule",
-          error: error.message,
-          values: {
-            maxPerDay: maxPerDay ?? 3,
-            windowDays: windowDays ?? 14,
-          },
-        });
-      } else {
-        next(error);
-      }
+      next(error);
     }
   };
 
   deleteTask = async (req, res, next) => {
     try {
       await this.#service.removeTask(req.params.id);
-      res.redirect(303, "/");
+      res.status(204).send();
     } catch (error) {
       next(error);
     }
