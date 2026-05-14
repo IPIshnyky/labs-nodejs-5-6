@@ -87,6 +87,25 @@ footer {
 }
 
 /* Task table */
+.task-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(120px, 160px)) auto;
+  gap: 0.85rem;
+  align-items: end;
+  margin: 1.5rem 0 1rem;
+}
+
+.task-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.task-reset-button {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
 .task-table {
   width: 100%;
   border-collapse: collapse;
@@ -226,6 +245,38 @@ footer {
   transform: translateY(-1px);
 }
 
+.task-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  justify-content: flex-end;
+  margin-top: -0.5rem;
+}
+
+.task-pagination button {
+  font-family: "Geist", sans-serif;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.task-pagination button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.task-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+#task-page-summary {
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+
 /* Forms and inputs: unify create/edit pages with dashboard theme */
 .form-card {
   margin-top: 1.5rem;
@@ -290,6 +341,15 @@ input[type="date"]:focus {
 }
 
 @media (max-width: 600px) {
+  .task-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .task-pagination {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
   .form-card {
     padding: 1rem;
   }

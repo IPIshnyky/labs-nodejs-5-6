@@ -1,0 +1,44 @@
+<form class="task-controls" id="task-filters" autocomplete="off">
+  <div class="task-control task-control-search">
+    <label class="form-label" for="task-search">Search</label>
+    <input
+      class="form-input"
+      id="task-search"
+      name="search"
+      type="search"
+      placeholder="Task title"
+    />
+  </div>
+
+  <div class="task-control">
+    <label class="form-label" for="task-status">Status</label>
+    <select class="form-select" id="task-status" name="status">
+      <option value="all">All</option>
+      <option value="pending">Pending</option>
+      <option value="done">Done</option>
+    </select>
+  </div>
+
+  <div class="task-control">
+    <label class="form-label" for="task-priority">Priority</label>
+    <select class="form-select" id="task-priority" name="priority">
+      <option value="all">All</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+  </div>
+
+  <div class="task-control">
+    <label class="form-label" for="task-page-size">Per page</label>
+    <select class="form-select" id="task-page-size" name="pageSize">
+      <option value="5">5</option>
+      <option value="10">10</option>
+      <option value="20">20</option>
+    </select>
+  </div>
+
+  <button class="btn task-reset-button" id="task-reset-filters" type="button">
+    Reset
+  </button>
+</form>
