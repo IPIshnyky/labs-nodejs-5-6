@@ -170,6 +170,7 @@ export class TaskService {
   async fetchTasksAdvanced(query) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
+    const search = typeof query.search === "string" ? query.search.trim() : "";
 
     if (!Number.isInteger(page) || page < 1) {
       const err = new Error("Page must be a positive integer");
@@ -183,10 +184,26 @@ export class TaskService {
       throw err;
     }
 
+    if (
+      query.priority !== undefined &&
+      !["low", "medium", "high"].includes(query.priority)
+    ) {
+      const err = new Error("Priority must be low, medium, or high");
+      err.status = 400;
+      throw err;
+    }
+
+    if (query.completed !== undefined && typeof query.completed !== "boolean") {
+      const err = new Error("Completed must be a boolean");
+      err.status = 400;
+      throw err;
+    }
+
     const { tasks, total } = await this.#repo.getWithFilters({
       ...query,
       page,
       limit,
+      search,
     });
 
     return {

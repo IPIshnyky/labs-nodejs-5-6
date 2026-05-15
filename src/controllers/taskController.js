@@ -1,3 +1,5 @@
+import { badRequest, parsePositiveInteger } from "../utils/queryParsers.js";
+
 export class TaskController {
   #service;
 
@@ -5,8 +7,57 @@ export class TaskController {
     this.#service = service;
   }
 
-  getAllTasks = async (_req, res, next) => {
+  #hasAdvancedQuery(query) {
+    return ["page", "limit", "pageSize", "search", "status", "priority"].some(
+      (key) => query[key] !== undefined,
+    );
+  }
+
+  #parseListQuery(query) {
+    const statusMap = {
+      pending: false,
+      done: true,
+    };
+
+    if (query.status !== undefined && query.status !== "all") {
+      if (!Object.hasOwn(statusMap, query.status)) {
+        throw badRequest("Status must be all, pending, or done");
+      }
+    }
+
+    if (
+      query.priority !== undefined &&
+      query.priority !== "all" &&
+      !["low", "medium", "high"].includes(query.priority)
+    ) {
+      throw badRequest("Priority must be all, low, medium, or high");
+    }
+
+    return {
+      page: parsePositiveInteger(query.page, "Page", 1),
+      limit: parsePositiveInteger(query.limit ?? query.pageSize, "Limit", 10),
+      search: typeof query.search === "string" ? query.search.trim() : "",
+      completed:
+        query.status !== undefined && query.status !== "all"
+          ? statusMap[query.status]
+          : undefined,
+      priority:
+        query.priority !== undefined && query.priority !== "all"
+          ? query.priority
+          : undefined,
+    };
+  }
+
+  getAllTasks = async (req, res, next) => {
     try {
+      if (this.#hasAdvancedQuery(req.query)) {
+        const result = await this.#service.fetchTasksAdvanced(
+          this.#parseListQuery(req.query),
+        );
+        res.json(result);
+        return;
+      }
+
       const tasks = await this.#service.fetchAllTasks();
       res.json(tasks);
     } catch (error) {

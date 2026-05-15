@@ -6,29 +6,40 @@ import {
   syncControls,
   writeStateToUrl,
 } from "./taskFilters.js";
-import { filterTasks, paginateTasks } from "./taskList.js";
 import { renderError, renderTasks } from "./renderTasks.js";
 import { renderPagination } from "./renderPagination.js";
 
-let tasks = [];
 let state = getStateFromUrl();
+let currentPage = {
+  data: [],
+  pagination: {
+    page: state.page,
+    limit: state.pageSize,
+    total: 0,
+    totalPages: 1,
+  },
+};
 
 const render = () => {
-  const filteredTasks = filterTasks(tasks, state);
-  const result = paginateTasks(filteredTasks, state);
+  const meta = {
+    page: currentPage.pagination.page,
+    pageSize: currentPage.pagination.limit,
+    totalItems: currentPage.pagination.total,
+    totalPages: Math.max(1, currentPage.pagination.totalPages),
+  };
 
-  state = { ...state, page: result.meta.page };
+  state = { ...state, page: meta.page };
   syncControls(state);
   writeStateToUrl(state);
-  renderTasks(result.items, {
-    ...result.meta,
+  renderTasks(currentPage.data, {
+    ...meta,
     hasFilters: hasActiveFilters(state),
   });
-  renderPagination(result.meta);
+  renderPagination(meta);
 };
 
 const reloadTasks = async () => {
-  tasks = await fetchTasks();
+  currentPage = await fetchTasks(state);
   render();
 };
 
@@ -41,12 +52,16 @@ document.getElementById("task-filters").addEventListener("input", (event) => {
       : event.target.value;
 
   state = { ...state, [event.target.name]: value, page: 1 };
-  render();
+  reloadTasks().catch((error) => {
+    renderError(error.message);
+  });
 });
 
 document.getElementById("task-reset-filters").addEventListener("click", () => {
   state = getDefaultState();
-  render();
+  reloadTasks().catch((error) => {
+    renderError(error.message);
+  });
 });
 
 document
@@ -57,7 +72,9 @@ document
 
     const delta = button.dataset.pageAction === "next" ? 1 : -1;
     state = { ...state, page: state.page + delta };
-    render();
+    reloadTasks().catch((error) => {
+      renderError(error.message);
+    });
   });
 
 document

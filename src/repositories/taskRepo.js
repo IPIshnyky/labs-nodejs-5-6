@@ -280,6 +280,7 @@ export class TaskRepo {
   async getWithFilters({
     page = 1,
     limit = 10,
+    search,
     priority,
     completed,
     dateFrom,
@@ -299,6 +300,12 @@ export class TaskRepo {
 
     if (completed !== undefined) {
       taskWhere.isDone = completed;
+    }
+
+    if (search) {
+      taskWhere.title = {
+        [Op.iLike]: `%${search}%`,
+      };
     }
 
     if (dateFrom) {

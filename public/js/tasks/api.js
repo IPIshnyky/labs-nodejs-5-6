@@ -13,7 +13,18 @@ export const requestJson = async (url, options = {}) => {
   return response.json();
 };
 
-export const fetchTasks = () => requestJson("/api/tasks");
+export const fetchTasks = (state) => {
+  const params = new URLSearchParams({
+    page: String(state.page),
+    limit: String(state.pageSize),
+  });
+
+  if (state.search) params.set("search", state.search);
+  if (state.status !== "all") params.set("status", state.status);
+  if (state.priority !== "all") params.set("priority", state.priority);
+
+  return requestJson(`/api/tasks?${params.toString()}`);
+};
 
 export const toggleTaskCompletion = (id, completed) => {
   return requestJson(`/api/tasks/${id}`, {
